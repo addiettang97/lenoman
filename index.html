@@ -31,19 +31,55 @@
         #result-overlay.visible { display: flex; }
 
         .result-cards-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
-        .result-card-item { background: linear-gradient(160deg,#1a1230,#0d0a1a); border: 1px solid rgba(212,175,55,0.5); border-radius: 14px; padding: 16px 14px; width: 180px; text-align: center; flex-shrink: 0; position: relative; }
-        .result-card-item .position-label { font-size: 11px; letter-spacing: 0.1em; color: rgba(212,175,55,0.6); margin-bottom: 8px; text-transform: uppercase; }
-        .result-card-item .card-emoji { font-size: 52px; line-height: 1; margin-bottom: 10px; }
-        .result-card-item .card-number { font-size: 12px; color: rgba(212,175,55,0.5); margin-bottom: 4px; }
-        .result-card-item .card-title { font-size: 15px; font-weight: bold; color: #f0d060; margin-bottom: 6px; }
-        .result-card-item .card-keyword { font-size: 12px; color: rgba(255,255,255,0.55); line-height: 1.5; }
+
+        /* 翻牌容器 */
+        .card-flip-wrap { perspective: 800px; width: 148px; flex-shrink: 0; }
+        .card-flip-inner {
+            position: relative; width: 148px; height: 220px;
+            transform-style: preserve-3d;
+            transition: transform 0.65s cubic-bezier(0.4,0,0.2,1);
+            cursor: pointer;
+        }
+        .card-flip-inner.flipped { transform: rotateY(180deg); }
+
+        /* 正面 / 背面共同样式 */
+        .card-face {
+            position: absolute; inset: 0; border-radius: 14px;
+            backface-visibility: hidden; -webkit-backface-visibility: hidden;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 14px 12px; text-align: center;
+        }
+        /* 背面 */
+        .card-face-back {
+            background: linear-gradient(160deg,#1a1230,#0d0a1a);
+            border: 1.5px solid rgba(212,175,55,0.5);
+            box-shadow: 0 0 18px rgba(107,63,160,0.3);
+        }
+        .card-face-back .back-orb { font-size: 52px; line-height: 1; filter: drop-shadow(0 0 10px rgba(212,175,55,0.4)); margin-bottom: 10px; }
+        .card-face-back .back-hint { font-size: 11px; color: rgba(212,175,55,0.45); letter-spacing: 0.08em; }
+
+        /* 正面（翻转后） */
+        .card-face-front {
+            transform: rotateY(180deg);
+            background: linear-gradient(160deg,#1a1230,#0d0a1a);
+            border: 1.5px solid rgba(212,175,55,0.7);
+            box-shadow: 0 0 24px rgba(212,175,55,0.25);
+        }
+        .card-face-front .position-label { font-size: 10px; letter-spacing: 0.1em; color: rgba(212,175,55,0.6); margin-bottom: 6px; text-transform: uppercase; }
+        .card-face-front .card-emoji { font-size: 46px; line-height: 1; margin-bottom: 8px; }
+        .card-face-front .card-number { font-size: 11px; color: rgba(212,175,55,0.5); margin-bottom: 3px; }
+        .card-face-front .card-title { font-size: 14px; font-weight: bold; color: #f0d060; margin-bottom: 5px; }
+        .card-face-front .card-keyword { font-size: 11px; color: rgba(255,255,255,0.55); line-height: 1.5; }
         .connector-arrow { color: rgba(212,175,55,0.5); font-size: 22px; align-self: center; flex-shrink: 0; }
 
-        .reading-panel { background: rgba(20,15,35,0.7); border: 1px solid rgba(212,175,55,0.2); border-radius: 16px; padding: 22px 24px; max-width: 700px; width: 100%; }
+        .reading-panel { background: rgba(20,15,35,0.7); border: 1px solid rgba(212,175,55,0.2); border-radius: 16px; padding: 22px 24px; max-width: 700px; width: 100%; transition: opacity 0.6s ease, transform 0.6s ease; }
+        .reading-panel.hidden { opacity: 0; transform: translateY(12px); pointer-events: none; }
         .reading-panel h3 { color: #d4af37; font-size: 16px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
         .reading-section { margin-bottom: 16px; }
         .reading-section .section-label { font-size: 12px; color: rgba(212,175,55,0.6); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
         .reading-section p { color: rgba(240,230,210,0.85); font-size: 14px; line-height: 1.8; }
+        /* 翻牌提示 */
+        #flip-hint { font-size: 13px; color: rgba(212,175,55,0.5); letter-spacing: 0.06em; margin-bottom: 20px; transition: opacity 0.4s; }
 
         #reset-btn { margin-top: 20px; padding: 12px 36px; background: rgba(212,175,55,0.15); border: 1px solid rgba(212,175,55,0.5); border-radius: 999px; color: #d4af37; font-size: 15px; cursor: pointer; letter-spacing: 0.08em; transition: all 0.2s; }
         #reset-btn:hover { background: rgba(212,175,55,0.3); box-shadow: 0 0 20px rgba(212,175,55,0.3); }
@@ -168,9 +204,10 @@
 
     <!-- 结果页 -->
     <div id="result-overlay">
-        <h2 style="color:#d4af37;font-size:20px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:20px;">✦ 命运三牌阵 ✦</h2>
+        <h2 style="color:#d4af37;font-size:20px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:16px;">✦ 命运三牌阵 ✦</h2>
+        <div id="flip-hint">点击牌面揭示命运</div>
         <div class="result-cards-row" id="result-cards-row"></div>
-        <div class="reading-panel" id="reading-panel">
+        <div class="reading-panel hidden" id="reading-panel">
             <h3 style="gap:8px;">☽ &nbsp;三牌联合解读</h3>
             <div class="reading-section">
                 <div class="section-label">过去 · 根源</div>
@@ -695,29 +732,63 @@
 
         const cardData = drawnCards.map(m => m.userData);
 
-        // 渲染三张牌卡片
-        cardData.forEach((cd, i) => {
-            const emojiIdx = LENORMAND_CARDS.findIndex(c => c.id === cd.id);
-            const posLabel = POSITIONS[i];
-            const itemHTML = `
-                <div class="result-card-item" style="animation: fadeInUp 0.4s ${i*0.15}s both;">
-                    <div class="position-label">${posLabel}</div>
-                    <div class="card-emoji">${CARD_EMOJIS[emojiIdx]}</div>
-                    <div class="card-number">NO. ${cd.id}</div>
-                    <div class="card-title">${cd.name}</div>
-                    <div class="card-keyword">${cd.keywords ? cd.keywords.join(' · ') : ''}</div>
-                </div>
-            `;
-            if (i > 0) row.insertAdjacentHTML('beforeend', '<div class="connector-arrow">→</div>');
-            row.insertAdjacentHTML('beforeend', itemHTML);
-        });
-
-        // 生成解读
+        // 预先生成解读（但不显示）
         const reading = generateReading(cardData);
         document.getElementById('read-past').textContent    = reading.past;
         document.getElementById('read-present').textContent = reading.present;
         document.getElementById('read-future').textContent  = reading.future;
         document.getElementById('read-overall').textContent = reading.overall;
+
+        // 渲染翻牌式卡片
+        let flippedCount = 0;
+        const readingPanel = document.getElementById('reading-panel');
+        const flipHint = document.getElementById('flip-hint');
+        readingPanel.classList.add('hidden');
+        flipHint.style.opacity = '1';
+
+        cardData.forEach((cd, i) => {
+            const emojiIdx = LENORMAND_CARDS.findIndex(c => c.id === cd.id);
+            const posLabel = POSITIONS[i];
+
+            const wrapHTML = `
+                <div class="card-flip-wrap" style="animation: fadeInUp 0.4s ${i*0.15}s both;">
+                    <div class="card-flip-inner" id="flip-inner-${i}">
+                        <!-- 背面 -->
+                        <div class="card-face card-face-back">
+                            <div class="back-orb">🔮</div>
+                            <div class="back-hint">点击揭示</div>
+                        </div>
+                        <!-- 正面 -->
+                        <div class="card-face card-face-front">
+                            <div class="position-label">${posLabel}</div>
+                            <div class="card-emoji">${CARD_EMOJIS[emojiIdx]}</div>
+                            <div class="card-number">NO. ${cd.id}</div>
+                            <div class="card-title">${cd.name}</div>
+                            <div class="card-keyword">${cd.keywords ? cd.keywords.join(' · ') : ''}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            if (i > 0) row.insertAdjacentHTML('beforeend', '<div class="connector-arrow">→</div>');
+            row.insertAdjacentHTML('beforeend', wrapHTML);
+
+            // 绑定翻牌点击
+            setTimeout(() => {
+                const inner = document.getElementById(`flip-inner-${i}`);
+                inner.addEventListener('click', () => {
+                    if (inner.classList.contains('flipped')) return;
+                    inner.classList.add('flipped');
+                    flippedCount++;
+                    // 全部翻开后显示解读
+                    if (flippedCount >= cardData.length) {
+                        flipHint.style.opacity = '0';
+                        setTimeout(() => {
+                            readingPanel.classList.remove('hidden');
+                        }, 400);
+                    }
+                });
+            }, 0);
+        });
 
         overlay.classList.add('visible');
     }
