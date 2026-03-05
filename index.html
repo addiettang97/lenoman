@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雷诺曼手势抽卡 - 灵性空间</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; overflow: hidden; background-color: #0a0a0c; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #video-container { position: fixed; bottom: 20px; right: 20px; width: 200px; height: 150px; border-radius: 12px; overflow: hidden; border: 2px solid rgba(255,255,255,0.15); z-index: 50; transform: scaleX(-1); }
+        #video-element { width: 100%; height: 100%; object-fit: cover; }
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0a0c; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; color: #d4af37; }
+        .cursor-ring { position: fixed; width: 44px; height: 44px; border: 2px solid #d4af37; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); transition: all 0.15s; z-index: 1000; }
+        .cursor-ring.swiping { width: 60px; height: 60px; border-color: #fff; background: rgba(212,175,55,0.2); box-shadow: 0 0 20px rgba(212,175,55,0.6); }
+
+        /* 手势提示条 */
+        #gesture-hint { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); z-index: 20; pointer-events: none; }
+        .hint-bar { background: rgba(0,0,0,0.55); backdrop-filter: blur(8px); border: 1px solid rgba(212,175,55,0.3); border-radius: 999px; padding: 10px 24px; color: #d4af37; font-size: 14px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 10px; }
+        .hint-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: #d4af37; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+
+        /* 滑动进度弧 */
+        #swipe-progress { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); z-index: 20; pointer-events: none; transition: opacity 0.3s; opacity: 0; }
+
+        /* 结果覆盖层 */
+        #result-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 30; background: rgba(5,3,12,0.92); backdrop-filter: blur(12px); display: none; flex-direction: column; align-items: center; padding: 24px 20px 20px; overflow-y: auto; }
+        #result-overlay.visible { display: flex; }
+
+        .result-cards-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
+        .result-card-item { background: linear-gradient(160deg,#1a1230,#0d0a1a); border: 1px solid rgba(212,175,55,0.5); border-radius: 14px; padding: 16px 14px; width: 180px; text-align: center; flex-shrink: 0; position: relative; }
+        .result-card-item .position-label { font-size: 11px; letter-spacing: 0.1em; color: rgba(212,175,55,0.6); margin-bottom: 8px; text-transform: uppercase; }
+        .result-card-item .card-emoji { font-size: 52px; line-height: 1; margin-bottom: 10px; }
+        .result-card-item .card-number { font-size: 12px; color: rgba(212,175,55,0.5); margin-bottom: 4px; }
+        .result-card-item .card-title { font-size: 15px; font-weight: bold; color: #f0d060; margin-bottom: 6px; }
+        .result-card-item .card-keyword { font-size: 12px; color: rgba(255,255,255,0.55); line-height: 1.5; }
+        .connector-arrow { color: rgba(212,175,55,0.5); font-size: 22px; align-self: center; flex-shrink: 0; }
+
+        .reading-panel { background: rgba(20,15,35,0.7); border: 1px solid rgba(212,175,55,0.2); border-radius: 16px; padding: 22px 24px; max-width: 700px; width: 100%; }
+        .reading-panel h3 { color: #d4af37; font-size: 16px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+        .reading-section { margin-bottom: 16px; }
+        .reading-section .section-label { font-size: 12px; color: rgba(212,175,55,0.6); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+        .reading-section p { color: rgba(240,230,210,0.85); font-size: 14px; line-height: 1.8; }
+
+        #reset-btn { margin-top: 20px; padding: 12px 36px; background: rgba(212,175,55,0.15); border: 1px solid rgba(212,175,55,0.5); border-radius: 999px; color: #d4af37; font-size: 15px; cursor: pointer; letter-spacing: 0.08em; transition: all 0.2s; }
+        #reset-btn:hover { background: rgba(212,175,55,0.3); box-shadow: 0 0 20px rgba(212,175,55,0.3); }
+
+        /* 欢迎引导页 */
+        #intro-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #0a0a0c; z-index: 200;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.8s ease;
+        }
+        #intro-screen.fade-out { opacity: 0; pointer-events: none; }
+
+        .intro-orb {
+            width: 90px; height: 90px; border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #fff8dc, #d4af37 40%, #6b3fa0 80%, #1a0a2e);
+            box-shadow: 0 0 40px rgba(212,175,55,0.5), 0 0 80px rgba(107,63,160,0.3);
+            animation: orb-breathe 2s ease-in-out infinite;
+            margin-bottom: 36px;
+        }
+        @keyframes orb-breathe {
+            0%,100% { transform: scale(1);   box-shadow: 0 0 40px rgba(212,175,55,0.5), 0 0 80px rgba(107,63,160,0.3); }
+            50%      { transform: scale(1.08); box-shadow: 0 0 60px rgba(212,175,55,0.8), 0 0 120px rgba(107,63,160,0.5); }
+        }
+
+        .intro-question {
+            font-size: 22px; letter-spacing: 0.12em; color: #f0d060;
+            margin-bottom: 12px; opacity: 0;
+            animation: fade-in-up 0.7s ease 0.3s forwards;
+        }
+        .intro-sub {
+            font-size: 14px; color: rgba(212,175,55,0.5); letter-spacing: 0.08em;
+            opacity: 0; animation: fade-in-up 0.7s ease 0.6s forwards;
+        }
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(14px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 倒计时进度环 */
+        .intro-timer-wrap {
+            margin-top: 40px; position: relative; width: 64px; height: 64px;
+            opacity: 0; animation: fade-in-up 0.7s ease 0.9s forwards;
+        }
+        .intro-timer-svg { transform: rotate(-90deg); }
+        .intro-timer-track { fill: none; stroke: rgba(212,175,55,0.12); stroke-width: 3; }
+        .intro-timer-ring  {
+            fill: none; stroke: #d4af37; stroke-width: 3;
+            stroke-linecap: round;
+            stroke-dasharray: 163; stroke-dashoffset: 163;
+            transition: stroke-dashoffset 0.05s linear;
+        }
+        .intro-timer-num {
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            color: #d4af37; font-size: 22px; font-weight: 300; letter-spacing: 0.02em;
+        }
+
+        /* header */
+        #header { position: fixed; top: 0; left: 0; width: 100%; z-index: 20; padding: 22px 28px; pointer-events: none; }
+        #draw-count { position: fixed; top: 22px; right: 28px; z-index: 20; display: flex; gap: 8px; }
+        .draw-slot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(212,175,55,0.5); transition: all 0.3s; }
+        .draw-slot.filled { background: #d4af37; box-shadow: 0 0 8px rgba(212,175,55,0.8); border-color: #d4af37; }
+    </style>
+</head>
+<body>
+
+    <!-- 流星雨层：在 Three.js canvas(z=0) 之上、UI(z=20)之下 -->
+    <canvas id="meteor-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:1;pointer-events:none;"></canvas>
+
+    <!-- 欢迎引导页 -->
+    <div id="intro-screen">
+        <div class="intro-orb"></div>
+        <div class="intro-question">心里默想你的问题</div>
+        <div class="intro-sub">3 秒后进入灵性空间</div>
+        <div class="intro-timer-wrap">
+            <svg class="intro-timer-svg" width="64" height="64" viewBox="0 0 64 64">
+                <circle class="intro-timer-track" cx="32" cy="32" r="26"/>
+                <circle class="intro-timer-ring" id="intro-ring" cx="32" cy="32" r="26"/>
+            </svg>
+            <div class="intro-timer-num" id="intro-num">3</div>
+        </div>
+    </div>
+
+    <div id="loading" class="loading-overlay">
+        <div class="text-4xl mb-4">🔮</div>
+        <div class="text-xl animate-pulse">正在链接灵性维度与摄像头...</div>
+        <div class="text-sm text-gray-500 mt-3">请允许摄像头权限</div>
+    </div>
+
+    <div id="header">
+        <h1 class="text-2xl font-light tracking-widest text-white opacity-70">LENORMAND ORACLE</h1>
+        <p class="text-gray-500 text-sm mt-1">将手从画面下方向上滑动，召唤命运的指引</p>
+    </div>
+
+    <div id="draw-count">
+        <div class="draw-slot" id="slot-0"></div>
+        <div class="draw-slot" id="slot-1"></div>
+        <div class="draw-slot" id="slot-2"></div>
+    </div>
+
+    <div id="video-container">
+        <video id="video-element" autoplay playsinline></video>
+    </div>
+
+    <div id="gesture-hint">
+        <div class="hint-bar">
+            <span class="dot"></span>
+            <span id="hint-text">将手从画面下方向上滑动 · 已选 <span id="hint-count">0</span>/3 张</span>
+        </div>
+        <div style="text-align:center;margin-top:8px;font-size:12px;color:rgba(212,175,55,0.45);letter-spacing:0.06em;">
+            点击空白处随机抽取 3 张
+        </div>
+    </div>
+
+    <svg id="swipe-progress" width="120" height="20">
+        <rect x="0" y="6" width="120" height="8" rx="4" fill="rgba(255,255,255,0.08)"/>
+        <rect id="progress-bar" x="0" y="6" width="0" height="8" rx="4" fill="#d4af37"/>
+        <text x="60" y="20" text-anchor="middle" fill="rgba(212,175,55,0.7)" font-size="10">↑ 继续上滑抽卡</text>
+    </svg>
+
+    <div id="cursor" class="cursor-ring"></div>
+
+    <!-- 结果页 -->
+    <div id="result-overlay">
+        <h2 style="color:#d4af37;font-size:20px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:20px;">✦ 命运三牌阵 ✦</h2>
+        <div class="result-cards-row" id="result-cards-row"></div>
+        <div class="reading-panel" id="reading-panel">
+            <h3 style="gap:8px;">☽ &nbsp;三牌联合解读</h3>
+            <div class="reading-section">
+                <div class="section-label">过去 · 根源</div>
+                <p id="read-past"></p>
+            </div>
+            <div class="reading-section">
+                <div class="section-label">现在 · 核心</div>
+                <p id="read-present"></p>
+            </div>
+            <div class="reading-section">
+                <div class="section-label">未来 · 走向</div>
+                <p id="read-future"></p>
+            </div>
+            <div class="reading-section" style="border-top:1px solid rgba(212,175,55,0.15);padding-top:14px;margin-top:4px;">
+                <div class="section-label">整体启示</div>
+                <p id="read-overall"></p>
+            </div>
+        </div>
+        <button id="reset-btn" onclick="resetAll()">重新占卜</button>
+    </div>
+
+    <script>
+    // ─── 雷诺曼 36 张卡牌 ───────────────────────────────────────────────
+    const LENORMAND_CARDS = [
+        { id:1,  name:"骑士",  en:"The Rider",      desc:"消息、新闻、新的人或事物进入你的生活。",        keywords:["消息","行动","速度"] },
+        { id:2,  name:"三叶草",en:"The Clover",     desc:"好运、小确幸、机会、积极的转折点。",          keywords:["好运","机遇","轻盈"] },
+        { id:3,  name:"船",    en:"The Ship",       desc:"旅行、距离、愿望、商业贸易、长期的转变。",     keywords:["旅程","渴望","远方"] },
+        { id:4,  name:"房子",  en:"The House",      desc:"家庭、安全、根基、舒适区、私生活。",          keywords:["家庭","安全","传统"] },
+        { id:5,  name:"树",    en:"The Tree",       desc:"健康、生命力、成长、耐力、业力联系。",        keywords:["健康","生命","根基"] },
+        { id:6,  name:"云",    en:"The Clouds",     desc:"困惑、不确定性、暂时的障碍、心理压力。",      keywords:["迷茫","模糊","压力"] },
+        { id:7,  name:"蛇",    en:"The Snake",      desc:"复杂性、背叛、诱惑、智慧或绕路而行。",        keywords:["复杂","诱惑","智慧"] },
+        { id:8,  name:"棺材",  en:"The Coffin",     desc:"结束、重要的转变、疾病、必须放手的事。",      keywords:["终结","转变","放手"] },
+        { id:9,  name:"花束",  en:"The Bouquet",    desc:"礼物、赞赏、幸福、聚会、社交成功。",          keywords:["喜悦","赞赏","社交"] },
+        { id:10, name:"镰刀",  en:"The Scythe",     desc:"突然的决定、切断、危险、快速的收获或结束。",   keywords:["决断","切割","突然"] },
+        { id:11, name:"鞭子",  en:"The Whip",       desc:"冲突、争论、体力劳动、重复的动作或惩罚。",    keywords:["冲突","重复","磨砺"] },
+        { id:12, name:"鸟",    en:"The Birds",      desc:"沟通、八卦、电话、焦虑、短程旅行。",          keywords:["沟通","焦虑","流言"] },
+        { id:13, name:"小孩",  en:"The Child",      desc:"新的开始、纯真、好奇心、小型的事务。",        keywords:["纯真","新生","好奇"] },
+        { id:14, name:"狐狸",  en:"The Fox",        desc:"聪明、狡猾、工作、陷阱、自保、虚假。",        keywords:["机智","谨慎","工作"] },
+        { id:15, name:"熊",    en:"The Bear",       desc:"权力、力量、保护者、理财、权威人物。",        keywords:["力量","保护","财富"] },
+        { id:16, name:"星星",  en:"The Stars",      desc:"希望、灵感、梦想、清晰的指引、宇宙的力量。",  keywords:["希望","指引","灵感"] },
+        { id:17, name:"鹳鸟",  en:"The Stork",      desc:"改变、迁移、改善、分娩、新的季节。",          keywords:["变化","迁移","新生"] },
+        { id:18, name:"狗",    en:"The Dog",        desc:"忠诚、友谊、信任、可靠的朋友或伴侣。",        keywords:["忠诚","友谊","信赖"] },
+        { id:19, name:"塔",    en:"The Tower",      desc:"机构、孤独、野心、法律事务、客观视角。",      keywords:["权威","孤独","秩序"] },
+        { id:20, name:"花园",  en:"The Garden",     desc:"公众、社交网络、群体、聚会、名誉。",          keywords:["社群","名誉","公众"] },
+        { id:21, name:"山",    en:"The Mountain",   desc:"阻碍、延迟、沉重、挑战、难以逾越的障碍。",    keywords:["阻碍","延迟","挑战"] },
+        { id:22, name:"路径",  en:"The Crossroads", desc:"抉择、多种可能性、分岔路、游疑不定。",        keywords:["选择","岔路","自由"] },
+        { id:23, name:"老鼠",  en:"The Mice",       desc:"损失、压力、担忧、慢慢被侵蚀、偷窃。",        keywords:["损失","侵蚀","焦虑"] },
+        { id:24, name:"心",    en:"The Heart",      desc:"爱情、情感、热情、亲密度、宽恕。",            keywords:["爱情","情感","宽恕"] },
+        { id:25, name:"戒指",  en:"The Ring",       desc:"承诺、合同、伴侣关系、循环、荣誉。",          keywords:["承诺","契约","循环"] },
+        { id:26, name:"书",    en:"The Book",       desc:"秘密、知识、研究、尚未揭晓的真相。",          keywords:["秘密","知识","探索"] },
+        { id:27, name:"信",    en:"The Letter",     desc:"正式文件、书面通讯、证书、消息传递。",        keywords:["文件","通讯","确认"] },
+        { id:28, name:"男人",  en:"The Man",        desc:"男性的能量、问卜者本人或生命中的重要男性。",   keywords:["理性","行动","男性"] },
+        { id:29, name:"女人",  en:"The Woman",      desc:"女性的能量、问卜者本人或生命中的重要女性。",   keywords:["直觉","包容","女性"] },
+        { id:30, name:"百合",  en:"The Lily",       desc:"和平、成熟、性、长寿、纯洁。",                keywords:["平和","成熟","纯洁"] },
+        { id:31, name:"太阳",  en:"The Sun",        desc:"成功、胜利、巨大的能量、光明、幸福。",        keywords:["成功","光明","活力"] },
+        { id:32, name:"月亮",  en:"The Moon",       desc:"直觉、情感、潜意识、名望、幻想。",            keywords:["直觉","潜意识","名望"] },
+        { id:33, name:"钥匙",  en:"The Key",        desc:"答案、重要性、打开机会、宿命、必然。",        keywords:["答案","机会","宿命"] },
+        { id:34, name:"鱼",    en:"The Fish",       desc:"财富、商业、流动的资源、丰饶、深度。",        keywords:["财富","流动","丰盛"] },
+        { id:35, name:"锚",    en:"The Anchor",     desc:"稳定、持久、最终目标、安全感。",              keywords:["稳定","目标","坚守"] },
+        { id:36, name:"十字架",en:"The Cross",      desc:"苦难、信仰、沉重的负担、宿命感。",            keywords:["使命","承担","信念"] }
+    ];
+
+    const CARD_EMOJIS = [
+        "🏇","🍀","⛵","🏠","🌳","☁️","🐍","⚰️","💐","⚔️",
+        "🪝","🐦","👶","🦊","🐻","⭐","🦢","🐕","🗼","🌿",
+        "⛰️","🛤️","🐭","❤️","💍","📖","✉️","🧑","👩","🌸",
+        "☀️","🌙","🔑","🐟","⚓","✝️"
+    ];
+
+    // ─── Three.js ────────────────────────────────────────────────────────
+    let scene, camera, renderer, cardsGroup, particles;
+    let drawnCards = [];       // 已抽出的三张牌 mesh
+    let isAnimating = false;
+    const DRAW_NEEDED = 3;
+
+    // 跑马灯参数
+    const CARD_SPACING = 2.1;
+    const SCROLL_SPEED = 0.022;
+    const VISIBLE_HALF_WIDTH = 12;
+    // 淡出区间：牌进入 FADE_START ~ FADE_END 时透明度从1→0
+    const FADE_START = -9.5;
+    const FADE_END   = -12.5;
+    let totalCardWidth = 0;
+
+    // 鼠标交互
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2(-9999, -9999);
+    let hoveredMesh = null;      // 当前 hover 的卡牌
+    let marqueesPaused = false;  // hover 时暂停跑马灯
+
+    // 绘制卡牌正面 canvas（支持 glow 高亮模式）
+    function drawCardFace(cardData, i, glow = false) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256; canvas.height = 384;
+        const ctx = canvas.getContext('2d');
+
+        if (glow) {
+            // 高亮背景
+            const grad = ctx.createLinearGradient(0,0,0,384);
+            grad.addColorStop(0,'#2a1d50'); grad.addColorStop(1,'#18103a');
+            ctx.fillStyle = grad; ctx.fillRect(0,0,256,384);
+            // 发光边框
+            ctx.shadowColor = '#d4af37';
+            ctx.shadowBlur = 28;
+            ctx.strokeStyle = '#ffe97a'; ctx.lineWidth = 8; ctx.strokeRect(8,8,240,368);
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(255,220,100,0.6)'; ctx.lineWidth = 2; ctx.strokeRect(16,16,224,352);
+        } else {
+            const grad = ctx.createLinearGradient(0,0,0,384);
+            grad.addColorStop(0,'#1a1230'); grad.addColorStop(1,'#0d0a1a');
+            ctx.fillStyle = grad; ctx.fillRect(0,0,256,384);
+            ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 8; ctx.strokeRect(8,8,240,368);
+            ctx.strokeStyle = 'rgba(212,175,55,0.3)'; ctx.lineWidth = 2; ctx.strokeRect(16,16,224,352);
+        }
+
+        ctx.fillStyle = glow ? '#ffe97a' : '#d4af37';
+        ctx.font = 'bold 26px serif'; ctx.textAlign = 'center';
+        ctx.fillText(cardData.id, 128, 50);
+        ctx.font = '88px Arial'; ctx.fillText(CARD_EMOJIS[i], 128, 192);
+        ctx.strokeStyle = glow ? 'rgba(255,220,100,0.6)' : 'rgba(212,175,55,0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(30,240); ctx.lineTo(226,240); ctx.stroke();
+        ctx.fillStyle = '#f0d060'; ctx.font = 'bold 17px serif';
+        ctx.fillText(cardData.name, 128, 274);
+        ctx.fillStyle = glow ? 'rgba(255,220,100,0.8)' : 'rgba(212,175,55,0.55)';
+        ctx.font = '12px Arial';
+        ctx.fillText(cardData.en, 128, 296);
+        return canvas;
+    }
+
+    function makeCardMesh(cardData, i) {
+        const geometry = new THREE.BoxGeometry(1.5, 2.2, 0.05);
+
+        const frontMat = new THREE.MeshPhongMaterial({
+            map: new THREE.CanvasTexture(drawCardFace(cardData, i, false)),
+            transparent: true
+        });
+        const frontMatGlow = new THREE.MeshPhongMaterial({
+            map: new THREE.CanvasTexture(drawCardFace(cardData, i, true)),
+            transparent: true,
+            emissive: new THREE.Color(0x3a2800),
+            emissiveIntensity: 0.6
+        });
+
+        // 背面
+        const bCanvas = document.createElement('canvas');
+        bCanvas.width = 256; bCanvas.height = 384;
+        const bCtx = bCanvas.getContext('2d');
+        const bGrad = bCtx.createLinearGradient(0,0,256,384);
+        bGrad.addColorStop(0,'#1a1230'); bGrad.addColorStop(1,'#0d0a1a');
+        bCtx.fillStyle = bGrad; bCtx.fillRect(0,0,256,384);
+        bCtx.strokeStyle = '#d4af37'; bCtx.lineWidth = 8; bCtx.strokeRect(8,8,240,368);
+        bCtx.font = '78px Arial'; bCtx.textAlign = 'center';
+        bCtx.fillStyle = 'rgba(212,175,55,0.25)'; bCtx.fillText('🔮', 128, 218);
+
+        const backMat = new THREE.MeshPhongMaterial({
+            map: new THREE.CanvasTexture(bCanvas),
+            transparent: true
+        });
+        const sideMat = new THREE.MeshPhongMaterial({ color: 0x2a1f4a, transparent: true });
+
+        const mesh = new THREE.Mesh(geometry, [
+            sideMat, sideMat, sideMat, sideMat,
+            frontMat,
+            backMat
+        ]);
+        mesh.userData = {
+            ...cardData, index: i,
+            _baseRotZ: 0, _baseRotY: 0,
+            _frontMat: frontMat,
+            _frontMatGlow: frontMatGlow,
+            _sideMat: sideMat,
+            _backMat: backMat
+        };
+        return mesh;
+    }
+
+    // 缓存 lerp 目标，避免每帧 new Vector3
+    const _scaleHov  = new THREE.Vector3(1.22, 1.22, 1.22);
+    const _scaleNorm = new THREE.Vector3(1, 1, 1);
+
+    // 设置一张牌所有材质的透明度（只在值变化时写入）
+    function setMeshOpacity(mesh, opacity) {
+        mesh.material.forEach(m => {
+            if (m.opacity !== opacity) m.opacity = opacity;
+        });
+    }
+
+    // 切换 hover 高亮材质（只在状态变化时执行，避免每帧替换）
+    function setMeshGlow(mesh, on) {
+        if (mesh.userData._glowOn === on) return;
+        mesh.userData._glowOn = on;
+        const mat = mesh.material.slice();
+        mat[4] = on ? mesh.userData._frontMatGlow : mesh.userData._frontMat;
+        mesh.material = mat;
+    }
+
+    function init3D() {
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x0a0a0c, 0.02);
+        camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 1000);
+        camera.position.z = 14;
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.setPixelRatio(devicePixelRatio);
+        Object.assign(renderer.domElement.style, { position:'fixed', top:'0', left:'0', zIndex:'0' });
+        document.body.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+        const pl = new THREE.PointLight(0xd4af37, 1.5, 60);
+        pl.position.set(5, 5, 10); scene.add(pl);
+        const bl = new THREE.PointLight(0x4a90d9, 0.7, 40);
+        bl.position.set(-8, -4, 8); scene.add(bl);
+
+        cardsGroup = new THREE.Group();
+        scene.add(cardsGroup);
+
+        const total = LENORMAND_CARDS.length;
+        totalCardWidth = total * CARD_SPACING;
+        LENORMAND_CARDS.forEach((cardData, i) => {
+            const mesh = makeCardMesh(cardData, i);
+            mesh.position.x = (i - total / 2) * CARD_SPACING;
+            mesh.rotation.z = (Math.random() - 0.5) * 0.12;
+            mesh.rotation.y = (Math.random() - 0.5) * 0.06;
+            mesh.userData._baseRotZ = mesh.rotation.z;
+            mesh.userData._baseRotY = mesh.rotation.y;
+            cardsGroup.add(mesh);
+        });
+
+        // 粒子
+        const pGeo = new THREE.BufferGeometry();
+        const pos = new Float32Array(600 * 3);
+        for (let j = 0; j < 600*3; j++) pos[j] = (Math.random()-0.5)*50;
+        pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        particles = new THREE.Points(pGeo, new THREE.PointsMaterial({ color:0xd4af37, size:0.055, transparent:true, opacity:0.45 }));
+        scene.add(particles);
+
+        // 鼠标事件
+        renderer.domElement.addEventListener('mousemove', onMouseMove);
+        renderer.domElement.addEventListener('click', onMouseClick);
+
+        animate();
+    }
+
+    // 鼠标移动：更新 raycaster 坐标
+    function onMouseMove(e) {
+        mouse.x =  (e.clientX / innerWidth)  * 2 - 1;
+        mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+    }
+
+    // 鼠标点击
+    function onMouseClick(e) {
+        if (drawnCards.length >= DRAW_NEEDED || isAnimating) return;
+        raycaster.setFromCamera(mouse, camera);
+        const cardMeshes = cardsGroup.children;
+        const hits = raycaster.intersectObjects(cardMeshes);
+        if (hits.length > 0) {
+            // 点击到具体卡牌
+            const mesh = hits[0].object;
+            const drawnIds = new Set(drawnCards.map(m => m.userData.id));
+            if (!drawnIds.has(mesh.userData.id)) {
+                animateDrawCard(mesh, drawnCards.length);
+            }
+        } else {
+            // 点击空白区域 → 随机抽
+            handleSwipeUp();
+        }
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const t = Date.now() * 0.001;
+
+        if (drawnCards.length < DRAW_NEEDED) {
+            // Raycaster hover 检测（每帧只做一次）
+            raycaster.setFromCamera(mouse, camera);
+            const hits = raycaster.intersectObjects(cardsGroup.children, false);
+            const newHovered = hits.length > 0 ? hits[0].object : null;
+
+            if (hoveredMesh !== newHovered) {
+                // 状态变化时才操作
+                if (hoveredMesh) setMeshGlow(hoveredMesh, false);
+                hoveredMesh = newHovered;
+                marqueesPaused = !!hoveredMesh;
+                document.body.style.cursor = hoveredMesh ? 'pointer' : 'default';
+            }
+
+            // 跑马灯（hover 时暂停）
+            if (!marqueesPaused) {
+                cardsGroup.children.forEach(mesh => {
+                    mesh.position.x -= SCROLL_SPEED;
+                    if (mesh.position.x < -VISIBLE_HALF_WIDTH - 1) {
+                        mesh.position.x += totalCardWidth;
+                    }
+                });
+            }
+
+            // 每张牌：淡出 + hover 缩放
+            cardsGroup.children.forEach(mesh => {
+                const wx = cardsGroup.position.x + mesh.position.x; // 世界 X 近似
+                // 淡出：进入淡出区间后透明度线性降为 0
+                let opacity = 1;
+                if (wx < FADE_START) {
+                    opacity = Math.max(0, (wx - FADE_END) / (FADE_START - FADE_END));
+                }
+                setMeshOpacity(mesh, opacity);
+
+                // hover 缩放与前移（lerp 系数调大让动画更跟手）
+                const isHov = mesh === hoveredMesh;
+                if (isHov) {
+                    setMeshGlow(mesh, true);
+                    mesh.scale.lerp(_scaleHov, 0.25);
+                    mesh.position.z += (1.8 - mesh.position.z) * 0.22;
+                } else {
+                    setMeshGlow(mesh, false);
+                    mesh.scale.lerp(_scaleNorm, 0.22);
+                    mesh.position.z += (0 - mesh.position.z) * 0.18;
+                }
+            });
+
+            // 整体漂浮
+            cardsGroup.position.y = Math.sin(t * 0.45) * 0.22;
+            cardsGroup.rotation.x = Math.sin(t * 0.28) * 0.025;
+            cardsGroup.rotation.y = 0;
+            cardsGroup.rotation.z = 0;
+        }
+
+        particles.rotation.y += 0.0003;
+        particles.rotation.x += 0.0001;
+        renderer.render(scene, camera);
+    }
+
+    // ─── 手势识别 ──────────────────────────────────────────────────────────
+    const videoElement = document.getElementById('video-element');
+    const cursorEl    = document.getElementById('cursor');
+    const loadingEl   = document.getElementById('loading');
+
+    // ── 手势状态：检测单次快速向上划动 ──
+    // 原理：对手腕 Y 做指数平滑，当平滑后速度超过阈值即触发，不需要蓄力
+    const SWIPE_SPEED_THRESHOLD = 0.022; // 每帧平滑速度阈值（归一化 0~1）
+    const SWIPE_COOLDOWN_MS = 1500;      // 触发后冷却，避免连续触发
+
+    let prevWristY = null;
+    let smoothDY   = 0;          // 指数平滑后的 dy
+    const SMOOTH_FACTOR = 0.35;  // 平滑系数（越大越灵敏）
+    let swipeCooldown = false;
+    let swipeReady = false;
+
+    const hands = new Hands({
+        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+    });
+    hands.setOptions({ maxNumHands:1, modelComplexity:1, minDetectionConfidence:0.65, minTrackingConfidence:0.6 });
+    hands.onResults(onHandResults);
+
+    function onHandResults(results) {
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            const lm = results.multiHandLandmarks[0];
+            const wrist    = lm[0];
+            const indexTip = lm[8];
+
+            // 镜像 X 显示光标
+            const cx = (1 - indexTip.x) * innerWidth;
+            const cy = indexTip.y * innerHeight;
+            cursorEl.style.left = `${cx}px`;
+            cursorEl.style.top  = `${cy}px`;
+
+            const wy = wrist.y; // 0=顶, 1=底
+
+            if (prevWristY !== null) {
+                const rawDY = prevWristY - wy; // 正值 = 手腕向上
+                // 指数平滑，抑制抖动
+                smoothDY = smoothDY * (1 - SMOOTH_FACTOR) + rawDY * SMOOTH_FACTOR;
+
+                if (smoothDY > SWIPE_SPEED_THRESHOLD && !swipeCooldown) {
+                    // 检测到快速向上动作，立即触发
+                    swipeCooldown = true;
+                    smoothDY = 0;
+                    prevWristY = null;
+                    cursorEl.classList.add('swiping');
+                    setTimeout(() => {
+                        cursorEl.classList.remove('swiping');
+                        swipeCooldown = false;
+                    }, SWIPE_COOLDOWN_MS);
+                    handleSwipeUp();
+                }
+            }
+
+            prevWristY = wy;
+            swipeReady = true;
+        } else {
+            // 手消失，重置状态
+            if (swipeReady) {
+                prevWristY = null;
+                smoothDY = 0;
+                swipeReady = false;
+            }
+            cursorEl.style.left = '-100px';
+            cursorEl.style.top  = '-100px';
+        }
+    }
+
+    function updateSwipeUI(p) {
+        // 已简化手势，进度条隐藏
+        document.getElementById('swipe-progress').style.opacity = '0';
+    }
+
+    // 上滑 → 随机抽一张未被抽过的牌（从 cardsGroup 当前可见区域附近随机选）
+    function handleSwipeUp() {
+        if (drawnCards.length >= DRAW_NEEDED || isAnimating) return;
+
+        const drawnIds = new Set(drawnCards.map(m => m.userData.id));
+        const pool = cardsGroup.children.filter(m => !drawnIds.has(m.userData.id));
+        if (pool.length === 0) return;
+
+        const randomMesh = pool[Math.floor(Math.random() * pool.length)];
+        animateDrawCard(randomMesh, drawnCards.length);
+    }
+
+    // ─── 抽卡动画 ─────────────────────────────────────────────────────────
+    // 三张牌的目标位置（中间偏上，左中右排列）
+    function getTargetPos(slotIndex) {
+        const offsets = [-3.0, 0, 3.0];
+        return new THREE.Vector3(offsets[slotIndex], 2.2, 7);
+    }
+
+    function animateDrawCard(mesh, slotIndex) {
+        isAnimating = true;
+        drawnCards.push(mesh);
+
+        // 让它脱离 cardsGroup，加入 scene 以独立运动
+        const worldPos = new THREE.Vector3();
+        mesh.getWorldPosition(worldPos);
+        const worldQuat = new THREE.Quaternion();
+        mesh.getWorldQuaternion(worldQuat);
+        cardsGroup.remove(mesh);
+        scene.add(mesh);
+        mesh.position.copy(worldPos);
+        mesh.quaternion.copy(worldQuat);
+
+        const startPos  = mesh.position.clone();
+        const targetPos = getTargetPos(slotIndex);
+        const targetQuat = new THREE.Quaternion(); // 正对摄像机
+
+        let p = 0;
+        const dur = 75;
+        function step() {
+            p++;
+            const t = easeInOut(p / dur);
+            mesh.position.lerpVectors(startPos, targetPos, t);
+            THREE.Quaternion.slerp(worldQuat, targetQuat, mesh.quaternion, t);
+            const s = 1 + Math.sin(t * Math.PI) * 0.25;
+            mesh.scale.set(s, s, s);
+            if (p < dur) {
+                requestAnimationFrame(step);
+            } else {
+                mesh.scale.set(1.1, 1.1, 1.1);
+                isAnimating = false;
+                updateDrawUI(slotIndex);
+                if (drawnCards.length === DRAW_NEEDED) {
+                    setTimeout(showResult, 800);
+                }
+            }
+        }
+        step();
+    }
+
+    function updateDrawUI(slotIndex) {
+        document.getElementById(`slot-${slotIndex}`).classList.add('filled');
+        document.getElementById('hint-count').textContent = drawnCards.length;
+        if (drawnCards.length >= DRAW_NEEDED) {
+            document.getElementById('gesture-hint').style.opacity = '0';
+        }
+    }
+
+    function easeInOut(t) {
+        return t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+    }
+
+    // ─── 结果页 ───────────────────────────────────────────────────────────
+    const POSITIONS = ["过去·根源", "现在·核心", "未来·走向"];
+
+    function generateReading(cards) {
+        // 基于三张牌的关键词生成解读文本
+        const [c1, c2, c3] = cards;
+        const kw = (c) => c.keywords.join('、');
+
+        const past = `${c1.name}（${c1.en}）携带着"${kw(c1)}"的能量，暗示过去的经历塑造了当前的处境。${c1.desc}这段过去的经历是理解现状的重要线索。`;
+
+        const present = `${c2.name}（${c2.en}）占据核心位置，以"${kw(c2)}"为主题贯穿当下。${c2.desc}此刻你正处于这种能量的中心，它深刻影响着你的每个决定。`;
+
+        const future = `${c3.name}（${c3.en}）指向前方，"${kw(c3)}"将是你即将遇见的主要力量。${c3.desc}顺应或有意识地应对这股能量，将是关键所在。`;
+
+        // 三牌联合解读
+        const combo = generateComboReading(c1, c2, c3);
+
+        return { past, present, future, overall: combo };
+    }
+
+    function generateComboReading(c1, c2, c3) {
+        // 组合能量评估
+        const positiveCards = new Set([2,9,13,16,18,24,25,31,32,33,34,35]);
+        const challengeCards = new Set([6,7,8,10,11,21,23,36]);
+
+        const scores = [c1,c2,c3].map(c => positiveCards.has(c.id) ? 1 : challengeCards.has(c.id) ? -1 : 0);
+        const total = scores.reduce((a,b) => a+b, 0);
+
+        let tone;
+        if (total >= 2)       tone = "整体牌阵散发出积极的振动，宇宙正向你敞开大门。";
+        else if (total === 1) tone = "牌阵呈现出挑战中蕴藏机遇的复杂格局。";
+        else if (total === 0) tone = "牌阵处于平衡状态，结果取决于你如何把握。";
+        else if (total === -1) tone = "牌阵中挑战的能量较强，但每次考验都是蜕变的契机。";
+        else                  tone = "牌阵揭示出深刻的转化时期，需要勇气与智慧共同应对。";
+
+        return `三张牌以"${c1.name} → ${c2.name} → ${c3.name}"的叙事线贯穿始终。${tone} 从"${c1.keywords[0]}"出发，经由"${c2.keywords[0]}"的洗礼，最终抵达"${c3.keywords[0]}"的彼岸——这是命运为你编织的独特旅程。请以开放的心态审视每一张牌背后的信息，它们共同构成了当前阶段最重要的灵性指引。`;
+    }
+
+    function showResult() {
+        const overlay = document.getElementById('result-overlay');
+        const row = document.getElementById('result-cards-row');
+        row.innerHTML = '';
+
+        const cardData = drawnCards.map(m => m.userData);
+
+        // 渲染三张牌卡片
+        cardData.forEach((cd, i) => {
+            const emojiIdx = LENORMAND_CARDS.findIndex(c => c.id === cd.id);
+            const posLabel = POSITIONS[i];
+            const itemHTML = `
+                <div class="result-card-item" style="animation: fadeInUp 0.4s ${i*0.15}s both;">
+                    <div class="position-label">${posLabel}</div>
+                    <div class="card-emoji">${CARD_EMOJIS[emojiIdx]}</div>
+                    <div class="card-number">NO. ${cd.id}</div>
+                    <div class="card-title">${cd.name}</div>
+                    <div class="card-keyword">${cd.keywords ? cd.keywords.join(' · ') : ''}</div>
+                </div>
+            `;
+            if (i > 0) row.insertAdjacentHTML('beforeend', '<div class="connector-arrow">→</div>');
+            row.insertAdjacentHTML('beforeend', itemHTML);
+        });
+
+        // 生成解读
+        const reading = generateReading(cardData);
+        document.getElementById('read-past').textContent    = reading.past;
+        document.getElementById('read-present').textContent = reading.present;
+        document.getElementById('read-future').textContent  = reading.future;
+        document.getElementById('read-overall').textContent = reading.overall;
+
+        overlay.classList.add('visible');
+    }
+
+    // ─── 重置 ─────────────────────────────────────────────────────────────
+    function resetAll() {
+        document.getElementById('result-overlay').classList.remove('visible');
+
+        // 移除已抽出的牌 mesh
+        drawnCards.forEach(m => scene.remove(m));
+        drawnCards = [];
+        isAnimating = false;
+
+        // 重置 UI
+        [0,1,2].forEach(i => document.getElementById(`slot-${i}`).classList.remove('filled'));
+        document.getElementById('hint-count').textContent = '0';
+        document.getElementById('gesture-hint').style.opacity = '1';
+
+        // 重建卡牌组
+        hoveredMesh = null;
+        marqueesPaused = false;
+        document.body.style.cursor = 'default';
+        scene.remove(cardsGroup);
+        cardsGroup = new THREE.Group();
+        scene.add(cardsGroup);
+        totalCardWidth = LENORMAND_CARDS.length * CARD_SPACING;
+        LENORMAND_CARDS.forEach((cardData, i) => {
+            const mesh = makeCardMesh(cardData, i);
+            mesh.position.x = (i - LENORMAND_CARDS.length / 2) * CARD_SPACING;
+            mesh.rotation.z = (Math.random() - 0.5) * 0.12;
+            mesh.rotation.y = (Math.random() - 0.5) * 0.06;
+            mesh.userData._baseRotZ = mesh.rotation.z;
+            mesh.userData._baseRotY = mesh.rotation.y;
+            cardsGroup.add(mesh);
+        });
+        // 重置手势状态
+        prevWristY = null;
+        smoothDY = 0;
+        swipeReady = false;
+    }
+
+    // 暴露给 HTML button
+    window.resetAll = resetAll;
+
+    // ─── MediaPipe Camera ─────────────────────────────────────────────────
+    const cameraInstance = new Camera(videoElement, {
+        onFrame: async () => { await hands.send({ image: videoElement }); },
+        width: 640, height: 480
+    });
+    cameraInstance.start().then(() => {
+        loadingEl.style.transition = 'opacity 0.8s';
+        loadingEl.style.opacity = '0';
+        setTimeout(() => { loadingEl.style.display = 'none'; }, 800);
+    }).catch(() => {
+        loadingEl.innerHTML = '<div class="text-4xl mb-4">⚠️</div><div class="text-xl" style="color:#f87171">摄像头权限被拒绝</div><div class="text-sm text-gray-500 mt-2">无法进行手势识别</div>';
+    });
+
+    // ─── 启动 ─────────────────────────────────────────────────────────────
+    window.onload = () => {
+        init3D();
+        initMeteors();
+        initIntroScreen(); // 欢迎引导页
+        window.addEventListener('resize', () => {
+            camera.aspect = innerWidth / innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(innerWidth, innerHeight);
+            // 同步流星雨画布尺寸
+            const mc = document.getElementById('meteor-canvas');
+            mc.width = innerWidth; mc.height = innerHeight;
+        });
+    };
+
+    // ─── 欢迎引导页（3s 倒计时）────────────────────────────────────────────
+    function initIntroScreen() {
+        const intro   = document.getElementById('intro-screen');
+        const ring    = document.getElementById('intro-ring');
+        const numEl   = document.getElementById('intro-num');
+        const circumference = 2 * Math.PI * 26; // r=26 => ~163.4
+
+        ring.style.strokeDasharray  = circumference;
+        ring.style.strokeDashoffset = circumference;
+
+        const DURATION = 3000; // 3 秒
+        const start = performance.now();
+
+        function tick(now) {
+            const elapsed = now - start;
+            const progress = Math.min(elapsed / DURATION, 1); // 0→1
+
+            // 进度环填充
+            ring.style.strokeDashoffset = circumference * (1 - progress);
+
+            // 倒计时数字
+            const remaining = Math.ceil((1 - progress) * 3);
+            numEl.textContent = remaining > 0 ? remaining : '';
+
+            if (progress < 1) {
+                requestAnimationFrame(tick);
+            } else {
+                // 淡出引导页
+                intro.classList.add('fade-out');
+                setTimeout(() => { intro.style.display = 'none'; }, 850);
+            }
+        }
+
+        // 动画稍作延迟，等 CSS 动画入场
+        setTimeout(() => requestAnimationFrame(tick), 1000);
+    }
+
+    // ─── 流星雨 ───────────────────────────────────────────────────────────
+    function initMeteors() {
+        const mc = document.getElementById('meteor-canvas');
+        mc.width = innerWidth;
+        mc.height = innerHeight;
+        const ctx = mc.getContext('2d');
+
+        // 每颗流星的参数
+        const METEOR_COUNT = 22;
+        const meteors = [];
+
+        function randomMeteor(init) {
+            // 流星从右上角区域出发，向左下方运动
+            // 方向：向左(-x) 向下(+y)，角度约 210°~240°（从正右方逆时针）
+            // vx < 0（向左），vy > 0（向下）
+            const angleDeg = 210 + Math.random() * 30;  // 210°~240°
+            const angleRad = (Math.PI / 180) * angleDeg;
+            const speed = 3.5 + Math.random() * 3.0;    // 每帧 3.5~6.5px，明显可见
+            const length = 80 + Math.random() * 140;     // 拖尾长度
+            const opacity = 0.5 + Math.random() * 0.5;   // 单颗透明度
+            // 起点：右侧上方区域（x 在屏幕右半至右侧外，y 在屏幕上方）
+            const startX = innerWidth * 0.5 + Math.random() * innerWidth;
+            const startY = -length - Math.random() * innerHeight * 0.5;
+            const vx = Math.cos(angleRad) * speed; // 负值，向左
+            const vy = Math.sin(angleRad) * speed; // 负值！sin(210°~240°) < 0，需要取反
+            return {
+                x: startX, y: startY,
+                vx: vx,
+                vy: -vy,  // 翻转 vy，使其向下运动（+y 方向）
+                length, opacity,
+                colorHead: `rgba(255,240,200,${opacity})`,
+                colorTail: `rgba(180,140,60,0)`,
+                lineWidth: 0.6 + Math.random() * 1.2,
+                delay: init ? Math.floor(Math.random() * 120) : 0
+            };
+        }
+
+        // 初始填充，让流星均匀散布在各阶段
+        for (let i = 0; i < METEOR_COUNT; i++) {
+            const m = randomMeteor(false);
+            // 初始时让流星分布在屏幕各个位置
+            const progress = Math.random();
+            const steps = progress * (innerWidth / Math.max(Math.abs(m.vx), 0.1));
+            m.x += m.vx * steps;
+            m.y += m.vy * steps;
+            meteors.push(m);
+        }
+
+        function drawMeteors() {
+            // 清除：用带透明度的黑色叠加，制造"拖尾残留"消散感
+            ctx.clearRect(0, 0, mc.width, mc.height);
+
+            meteors.forEach((m, idx) => {
+                if (m.delay > 0) { m.delay--; return; }
+
+                // 推进位置
+                m.x += m.vx;
+                m.y += m.vy;
+
+                // 超出屏幕下方或左方则重置
+                if (m.y > mc.height + m.length || m.x < -m.length) {
+                    meteors[idx] = randomMeteor(true);
+                    return;
+                }
+
+                // 绘制拖尾线段（从尾到头，渐变透明）
+                const tailX = m.x - Math.cos(Math.atan2(m.vy, m.vx)) * m.length;
+                const tailY = m.y - Math.sin(Math.atan2(m.vy, m.vx)) * m.length;
+
+                const grad = ctx.createLinearGradient(tailX, tailY, m.x, m.y);
+                grad.addColorStop(0, m.colorTail);
+                grad.addColorStop(1, m.colorHead);
+
+                ctx.save();
+                ctx.globalAlpha = 0.2; // 整个层限制在 20% 透明度
+                ctx.beginPath();
+                ctx.moveTo(tailX, tailY);
+                ctx.lineTo(m.x, m.y);
+                ctx.strokeStyle = grad;
+                ctx.lineWidth = m.lineWidth;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+
+                // 头部亮点
+                ctx.beginPath();
+                ctx.arc(m.x, m.y, m.lineWidth * 0.9, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255,248,220,${m.opacity * 1.4})`;
+                ctx.fill();
+                ctx.restore();
+            });
+
+            requestAnimationFrame(drawMeteors);
+        }
+
+        drawMeteors();
+    }
+
+    // fadeInUp 动画
+    const style = document.createElement('style');
+    style.textContent = `@keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }`;
+    document.head.appendChild(style);
+    </script>
+</body>
+</html>
+h
