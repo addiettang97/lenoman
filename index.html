@@ -11,14 +11,262 @@
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; overflow: hidden; background-color: #0a0a0c; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            #video-container { 
+                bottom: 15px; 
+                right: 10px; 
+                width: 120px; 
+                height: 90px; 
+            }
+            #gesture-hint { 
+                bottom: 20px; 
+                left: 10px; 
+                right: 10px; 
+                transform: none; 
+            }
+            .hint-bar { 
+                font-size: 12px; 
+                padding: 8px 16px; 
+                justify-content: center; 
+            }
+            #header { 
+                padding: 15px; 
+            }
+            #header h1 {
+                font-size: 18px !important;
+            }
+            #draw-count { 
+                top: 15px; 
+                right: 15px; 
+            }
+            .draw-slot { 
+                width: 10px; 
+                height: 10px; 
+            }
+            #swipe-progress { 
+                bottom: 60px; 
+            }
+            /* 标签选择页移动端 */
+            .topic-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 10px !important;
+                padding: 0 10px;
+            }
+            .topic-btn {
+                padding: 12px 8px;
+            }
+            .topic-btn .icon {
+                font-size: 24px;
+            }
+            .topic-btn .label {
+                font-size: 12px;
+            }
+            /* 结果页移动端 */
+            .result-cards-row {
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+            }
+            .result-card-item {
+                width: 90%;
+                max-width: 280px;
+                padding: 12px;
+            }
+            .connector-arrow {
+                transform: rotate(90deg);
+                margin: 5px 0;
+            }
+            .reading-panel {
+                padding: 16px;
+                margin: 0 10px;
+            }
+            .reading-panel h3 {
+                font-size: 14px;
+            }
+            .reading-section p {
+                font-size: 13px;
+            }
+            #reset-btn {
+                padding: 10px 28px;
+                font-size: 14px;
+            }
+            /* Loading移动端 */
+            .crystal-ball {
+                width: 80px;
+                height: 80px;
+            }
+            .ball-outer {
+                width: 70px;
+                height: 70px;
+            }
+            .sand-container {
+                width: 50px;
+                height: 50px;
+                top: 10px;
+                left: 10px;
+            }
+            .glow-ring {
+                width: 60px;
+                height: 60px;
+            }
+            .glow-ring-2 {
+                width: 45px;
+                height: 45px;
+            }
+        }
+        
+        /* 更小屏幕 */
+        @media (max-width: 480px) {
+            #video-container {
+                bottom: 10px;
+                right: 8px;
+                width: 100px;
+                height: 75px;
+            }
+            .topic-title {
+                font-size: 18px;
+            }
+            .topic-sub {
+                font-size: 12px;
+            }
+        }
+        
         #video-container { position: fixed; bottom: 20px; right: 20px; width: 200px; height: 150px; border-radius: 12px; overflow: hidden; border: 2px solid rgba(255,255,255,0.15); z-index: 50; transform: scaleX(-1); }
         #video-element { width: 100%; height: 100%; object-fit: cover; }
         .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0a0c; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; color: #d4af37; }
+        
+        /* 水晶球动画 - 透明流沙旋转效果 */
+        .crystal-ball {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            perspective: 1000px;
+        }
+        .ball-outer {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: radial-gradient(ellipse at 30% 30%,
+                rgba(255,255,255,0.15) 0%,
+                rgba(200,180,255,0.08) 30%,
+                rgba(100,80,200,0.12) 60%,
+                rgba(40,20,80,0.05) 100%);
+            box-shadow:
+                0 0 40px rgba(150,100,255,0.15),
+                0 0 80px rgba(100,60,200,0.08),
+                inset 0 0 30px rgba(255,255,255,0.05),
+                inset -10px -10px 30px rgba(80,60,150,0.1);
+            position: relative;
+            animation: ball-float 4s ease-in-out infinite;
+        }
+        /* 流沙层 */
+        .sand-container {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            top: 10px;
+            left: 10px;
+            border-radius: 50%;
+            overflow: hidden;
+            animation: sand-rotate 12s linear infinite;
+        }
+        .sand-particle {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: linear-gradient(135deg, rgba(255,240,200,0.9), rgba(200,180,255,0.6));
+            border-radius: 50%;
+            box-shadow: 0 0 6px rgba(255,220,150,0.8);
+        }
+        /* 弥散光层 */
+        .glow-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle,
+                rgba(180,140,255,0.3) 0%,
+                rgba(150,100,255,0.15) 40%,
+                transparent 70%);
+            animation: glow-pulse 3s ease-in-out infinite, glow-rotate 20s linear infinite;
+            opacity: 0.8;
+        }
+        .glow-ring-2 {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle,
+                rgba(255,200,100,0.2) 0%,
+                rgba(200,150,255,0.1) 50%,
+                transparent 70%);
+            animation: glow-pulse 3s ease-in-out infinite 1s, glow-rotate-reverse 15s linear infinite;
+            opacity: 0.6;
+        }
+        .ball-inner {
+            position: absolute;
+            top: 15%;
+            left: 15%;
+            width: 70%;
+            height: 70%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 50% 50%, rgba(200,180,255,0.2), transparent 60%);
+        }
+        .ball-shine {
+            position: absolute;
+            top: 12%;
+            left: 20%;
+            width: 25%;
+            height: 15%;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.6);
+            filter: blur(4px);
+            animation: shine-pulse 2.5s ease-in-out infinite;
+        }
+        .ball-base {
+            width: 60px;
+            height: 12px;
+            background: radial-gradient(ellipse, rgba(80,60,120,0.5), transparent);
+            margin: -5px auto 0;
+            border-radius: 50%;
+        }
+        @keyframes ball-float {
+            0%, 100% { transform: translateY(0) rotateX(5deg); }
+            50% { transform: translateY(-12px) rotateX(-5deg); }
+        }
+        @keyframes sand-rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes glow-rotate {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        @keyframes glow-rotate-reverse {
+            from { transform: translate(-50%, -50%) rotate(360deg); }
+            to { transform: translate(-50%, -50%) rotate(0deg); }
+        }
+        @keyframes glow-pulse {
+            0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 0.9; transform: translate(-50%, -50%) scale(1.1); }
+        }
+        @keyframes shine-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.8; }
+        }
         .cursor-ring { position: fixed; width: 44px; height: 44px; border: 2px solid #d4af37; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); transition: all 0.15s; z-index: 1000; }
         .cursor-ring.swiping { width: 60px; height: 60px; border-color: #fff; background: rgba(212,175,55,0.2); box-shadow: 0 0 20px rgba(212,175,55,0.6); }
 
         /* 手势提示条 */
-        #gesture-hint { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); z-index: 20; pointer-events: none; }
+        #gesture-hint { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); z-index: 20; pointer-events: none; display: none; }
         .hint-bar { background: rgba(0,0,0,0.55); backdrop-filter: blur(8px); border: 1px solid rgba(212,175,55,0.3); border-radius: 999px; padding: 10px 24px; color: #d4af37; font-size: 14px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 10px; }
         .hint-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: #d4af37; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
@@ -31,7 +279,7 @@
         #result-overlay.visible { display: flex; }
 
         .result-cards-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
-        .result-card-item { background: linear-gradient(160deg,#1a1230,#0d0a1a); border: 1px solid rgba(212,175,55,0.5); border-radius: 14px; padding: 16px 14px; width: 180px; text-align: center; flex-shrink: 0; }
+        .result-card-item { background: linear-gradient(160deg,#1a1230,#0d0a1a); border: 1px solid rgba(212,175,55,0.5); border-radius: 14px; padding: 16px 14px; width: 180px; text-align: center; flex-shrink: 0; position: relative; }
         .result-card-item .position-label { font-size: 11px; letter-spacing: 0.1em; color: rgba(212,175,55,0.6); margin-bottom: 8px; text-transform: uppercase; }
         .result-card-item .card-emoji { font-size: 52px; line-height: 1; margin-bottom: 10px; }
         .result-card-item .card-number { font-size: 12px; color: rgba(212,175,55,0.5); margin-bottom: 4px; }
@@ -48,11 +296,65 @@
         #reset-btn { margin-top: 20px; padding: 12px 36px; background: rgba(212,175,55,0.15); border: 1px solid rgba(212,175,55,0.5); border-radius: 999px; color: #d4af37; font-size: 15px; cursor: pointer; letter-spacing: 0.08em; transition: all 0.2s; }
         #reset-btn:hover { background: rgba(212,175,55,0.3); box-shadow: 0 0 20px rgba(212,175,55,0.3); }
 
+        /* 场景标签选择页 */
+        #topic-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #0a0a0c; z-index: 180;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        #topic-screen.visible { display: flex; }
+        
+        .topic-title {
+            font-size: 22px; color: #f0d060; letter-spacing: 0.12em;
+            margin-bottom: 8px; text-align: center;
+        }
+        .topic-sub {
+            font-size: 14px; color: rgba(212,175,55,0.5); letter-spacing: 0.08em;
+            margin-bottom: 28px; text-align: center;
+        }
+        
+        .topic-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+            max-width: 520px; width: 100%; margin-bottom: 28px;
+        }
+        .topic-btn {
+            background: rgba(26,18,48,0.8); border: 1px solid rgba(212,175,55,0.3);
+            border-radius: 14px; padding: 16px 12px; cursor: pointer;
+            transition: all 0.25s; display: flex; flex-direction: column; align-items: center;
+            gap: 8px;
+        }
+        .topic-btn:hover {
+            background: rgba(42,29,80,0.9); border-color: rgba(212,175,55,0.6);
+            transform: translateY(-2px);
+        }
+        .topic-btn.selected {
+            background: linear-gradient(160deg, #2a1d50, #1a1230);
+            border-color: #d4af37; box-shadow: 0 0 20px rgba(212,175,55,0.3);
+        }
+        .topic-btn .icon { font-size: 28px; }
+        .topic-btn .label { font-size: 14px; color: #d4af37; letter-spacing: 0.05em; }
+        
+        .topic-confirm-btn {
+            padding: 14px 48px; background: rgba(212,175,55,0.15);
+            border: 1px solid rgba(212,175,55,0.5); border-radius: 999px;
+            color: #d4af37; font-size: 16px; cursor: pointer;
+            letter-spacing: 0.1em; transition: all 0.2s;
+            opacity: 0.5; pointer-events: none;
+        }
+        .topic-confirm-btn.active {
+            opacity: 1; pointer-events: auto;
+        }
+        .topic-confirm-btn:hover {
+            background: rgba(212,175,55,0.3); box-shadow: 0 0 25px rgba(212,175,55,0.4);
+        }
+
         /* 欢迎引导页 */
         #intro-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #0a0a0c; z-index: 200;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
             transition: opacity 0.8s ease;
         }
         #intro-screen.fade-out { opacity: 0; pointer-events: none; }
@@ -102,8 +404,8 @@
         }
 
         /* header */
-        #header { position: fixed; top: 0; left: 0; width: 100%; z-index: 20; padding: 22px 28px; pointer-events: none; }
-        #draw-count { position: fixed; top: 22px; right: 28px; z-index: 20; display: flex; gap: 8px; }
+        #header { position: fixed; top: 0; left: 0; width: 100%; z-index: 20; padding: 22px 28px; pointer-events: none; display: none; }
+        #draw-count { position: fixed; top: 22px; right: 28px; z-index: 20; display: none; gap: 8px; }
         .draw-slot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(212,175,55,0.5); transition: all 0.3s; }
         .draw-slot.filled { background: #d4af37; box-shadow: 0 0 8px rgba(212,175,55,0.8); border-color: #d4af37; }
     </style>
@@ -128,9 +430,26 @@
     </div>
 
     <div id="loading" class="loading-overlay">
-        <div class="text-4xl mb-4">🔮</div>
-        <div class="text-xl animate-pulse">正在链接灵性维度与摄像头...</div>
+        <div class="crystal-ball">
+            <div class="ball-outer">
+                <div class="glow-ring"></div>
+                <div class="glow-ring-2"></div>
+                <div class="sand-container" id="sand-container"></div>
+                <div class="ball-inner"></div>
+                <div class="ball-shine"></div>
+            </div>
+            <div class="ball-base"></div>
+        </div>
+        <div class="text-xl animate-pulse mt-4">正在链接灵性维度与摄像头...</div>
         <div class="text-sm text-gray-500 mt-3">请允许摄像头权限</div>
+    </div>
+
+    <!-- 场景标签选择页 -->
+    <div id="topic-screen">
+        <div class="topic-title">选择你的占卜场景</div>
+        <div class="topic-sub">不同场景解读侧重点不同</div>
+        <div class="topic-grid" id="topic-grid"></div>
+        <button class="topic-confirm-btn" id="topic-confirm" onclick="confirmTopic()">开始占卜</button>
     </div>
 
     <div id="header">
@@ -151,7 +470,7 @@
     <div id="gesture-hint">
         <div class="hint-bar">
             <span class="dot"></span>
-            <span id="hint-text">将手从画面下方向上滑动 · 已选 <span id="hint-count">0</span>/3 张</span>
+            <span id="hint-text">手掌翻动抽卡 · 已选 <span id="hint-count">0</span>/3 张</span>
         </div>
         <div style="text-align:center;margin-top:8px;font-size:12px;color:rgba(212,175,55,0.45);letter-spacing:0.06em;">
             点击空白处随机抽取 3 张
@@ -193,6 +512,75 @@
     </div>
 
     <script>
+    // ─── 塔罗高频占卜场景标签 ─────────────────────────────────────────────
+    const TOPICS = [
+        { id: 'love',    icon: '💕', label: '爱情感情', category: '感情', keywords: ['爱情', '伴侣', '缘分', '情感'] },
+        { id: 'career',  icon: '💼', label: '事业发展', category: '事业', keywords: ['工作', '晋升', '创业', '事业'] },
+        { id: 'study',   icon: '📚', label: '学业考试', category: '学业', keywords: ['学业', '考试', '学习', '升学'] },
+        { id: 'finance', icon: '💰', label: '财运投资', category: '财运', keywords: ['财富', '投资', '收入', '财务'] },
+        { id: 'health',  icon: '💪', label: '健康平安', category: '健康', keywords: ['健康', '身体', '康复', '养生'] },
+        { id: 'social',  icon: '🤝', label: '人际关系', category: '人际', keywords: ['朋友', '合作', '社交', '人际'] },
+        { id: 'family',  icon: '🏠', label: '家庭生活', category: '家庭', keywords: ['家庭', '亲人', '居住', '迁移'] },
+        { id: 'travel',  icon: '✈️', label: '旅行出行', category: '旅行', keywords: ['旅行', '出行', '搬迁', '变动'] },
+        { id: 'decision',icon: '⚖️', label: '决策选择', category: '决策', keywords: ['选择', '决定', '方向', '目标'] },
+        { id: 'spirit',  icon: '🧘', label: '心灵成长', category: '心灵', keywords: ['成长', '觉醒', '内省', '灵性'] },
+        { id: 'future',  icon: '🔮', label: '未来展望', category: '未来', keywords: ['前景', '展望', '命运', '趋势'] },
+        { id: 'mystery', icon: '🌙', label: '神秘事物', category: '神秘', keywords: ['直觉', '潜意识的', '梦境', '预知'] }
+    ];
+
+    // 场景与卡牌能量的关联权重
+    const TOPIC_WEIGHTS = {
+        love:    { positive: [24,25,18,9,2],   negative: [7,8,23],  focus: ['爱情', '伴侣', '缘分', '情感', '亲密'] },
+        career:  { positive: [15,31,34,35],    negative: [21,23,10], focus: ['事业', '工作', '晋升', '目标', '成就'] },
+        study:   { positive: [26,16,32,13],   negative: [6,21],    focus: ['学业', '考试', '学习', '知识', '成长'] },
+        finance: { positive: [34,31,15,2,25], negative: [23,8,36], focus: ['财富', '收入', '投资', '财务', '丰盛'] },
+        health:  { positive: [5,31,35,30],    negative: [8,23,6],  focus: ['健康', '身体', '康复', '活力', '平衡'] },
+        social:  { positive: [18,20,9,24],    negative: [7,11,23], focus: ['人际', '友谊', '合作', '社交', '信任'] },
+        family:  { positive: [4,17,35,5],     negative: [19,21,8], focus: ['家庭', '亲人', '居住', '稳定', '归属'] },
+        travel:  { positive: [3,17,20,22],    negative: [21,8],    focus: ['旅行', '出行', '变动', '新开始', '转变'] },
+        decision:{ positive: [33,16,22,2],    negative: [10,7,21], focus: ['选择', '决定', '方向', '答案', '指引'] },
+        spirit:  { positive: [16,32,30,36],   negative: [6,8],     focus: ['成长', '觉醒', '内省', '灵性', '智慧'] },
+        future:  { positive: [16,31,32,34],   negative: [6,21,23], focus: ['前景', '展望', '命运', '趋势', '希望'] },
+        mystery: { positive: [32,26,16,33],   negative: [6,8],     focus: ['直觉', '潜意识的', '梦境', '预知', '神秘'] }
+    };
+
+    // 当前选择的场景
+    let selectedTopic = null;
+    // 是否已确认场景选择（确认后才允许点击抽卡）
+    let topicConfirmed = false;
+
+    // 渲染场景标签
+    function renderTopics() {
+        const grid = document.getElementById('topic-grid');
+        grid.innerHTML = TOPICS.map(t => `
+            <div class="topic-btn" data-id="${t.id}" onclick="selectTopic('${t.id}')">
+                <span class="icon">${t.icon}</span>
+                <span class="label">${t.label}</span>
+            </div>
+        `).join('');
+    }
+
+    // 选择场景
+    function selectTopic(id) {
+        selectedTopic = id;
+        document.querySelectorAll('.topic-btn').forEach(btn => {
+            btn.classList.toggle('selected', btn.dataset.id === id);
+        });
+        document.getElementById('topic-confirm').classList.add('active');
+    }
+
+    // 确认场景选择，进入抽卡
+    function confirmTopic() {
+        if (!selectedTopic) return;
+        document.getElementById('topic-screen').classList.remove('visible');
+        // 显示抽卡页UI元素
+        document.getElementById('header').style.display = 'block';
+        document.getElementById('draw-count').style.display = 'flex';
+        document.getElementById('gesture-hint').style.display = 'block';
+        // 确认场景后才允许点击抽卡
+        topicConfirmed = true;
+    }
+
     // ─── 雷诺曼 36 张卡牌 ───────────────────────────────────────────────
     const LENORMAND_CARDS = [
         { id:1,  name:"骑士",  en:"The Rider",      desc:"消息、新闻、新的人或事物进入你的生活。",        keywords:["消息","行动","速度"] },
@@ -247,9 +635,9 @@
     const DRAW_NEEDED = 3;
 
     // 跑马灯参数
-    const CARD_SPACING = 2.1;
+    const CARD_SPACING = window.innerWidth < 768 ? 1.6 : 2.1;
     const SCROLL_SPEED = 0.022;
-    const VISIBLE_HALF_WIDTH = 12;
+    const VISIBLE_HALF_WIDTH = window.innerWidth < 768 ? 8 : 12;
     // 淡出区间：牌进入 FADE_START ~ FADE_END 时透明度从1→0
     const FADE_START = -9.5;
     const FADE_END   = -12.5;
@@ -332,10 +720,13 @@
         });
         const sideMat = new THREE.MeshPhongMaterial({ color: 0x2a1f4a, transparent: true });
 
+        // 跑马灯只显示背面，抽取时才翻转显示正面
+        // 摄像机在 z>0 看向 -z 方向，所以 index 4 是朝向摄像机的面
+        // 我们把背面放在 index 4，这样跑马灯默认显示背面
         const mesh = new THREE.Mesh(geometry, [
             sideMat, sideMat, sideMat, sideMat,
-            backMat,   // 初始正对摄像机的面显示背面
-            frontMat   // 背朝摄像机的面放正面纹理（备用）
+            backMat,   // 初始朝向摄像机显示背面
+            frontMat   // 背朝摄像机显示正面（备用）
         ]);
         mesh.userData = {
             ...cardData, index: i,
@@ -359,25 +750,22 @@
         });
     }
 
-    // 切换 hover 高亮效果（背面始终不变，只改发光强度）
+    // 切换 hover 高亮材质（只在状态变化时执行，避免每帧替换）
+    // 修改：跑马灯hover时保持背面，只在抽取动画时才切换正面
     function setMeshGlow(mesh, on) {
         if (mesh.userData._glowOn === on) return;
         mesh.userData._glowOn = on;
-        // 不切换材质，只调整背面材质的发光
-        const backMat = mesh.userData._backMat;
-        if (on) {
-            backMat.emissive = new THREE.Color(0x3a2800);
-            backMat.emissiveIntensity = 0.8;
-        } else {
-            backMat.emissiveIntensity = 0;
-        }
+        // 跑马灯阶段保持背面，不切换到正面
+        // 只有在抽取动画中才切换到正面
     }
 
     function init3D() {
         scene = new THREE.Scene();
         scene.fog = new THREE.FogExp2(0x0a0a0c, 0.02);
-        camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 1000);
-        camera.position.z = 14;
+        // 移动端调整相机视野
+        const isMobile = window.innerWidth < 768;
+        camera = new THREE.PerspectiveCamera(isMobile ? 85 : 70, innerWidth/innerHeight, 0.1, 1000);
+        camera.position.z = isMobile ? 10 : 14;
 
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(innerWidth, innerHeight);
@@ -396,9 +784,15 @@
 
         const total = LENORMAND_CARDS.length;
         totalCardWidth = total * CARD_SPACING;
-        const shuffled = [...LENORMAND_CARDS].sort(() => Math.random() - 0.5);
-        shuffled.forEach((cardData, i) => {
-            const mesh = makeCardMesh(cardData, i);
+        // 随机乱序排列卡牌
+        const cardIndices = Array.from({length: total}, (_, i) => i);
+        // Fisher-Yates 洗牌算法
+        for (let i = cardIndices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [cardIndices[i], cardIndices[j]] = [cardIndices[j], cardIndices[i]];
+        }
+        cardIndices.forEach((origIndex, i) => {
+            const mesh = makeCardMesh(LENORMAND_CARDS[origIndex], origIndex);
             mesh.position.x = (i - total / 2) * CARD_SPACING;
             mesh.rotation.z = (Math.random() - 0.5) * 0.12;
             mesh.rotation.y = (Math.random() - 0.5) * 0.06;
@@ -442,8 +836,10 @@
                 animateDrawCard(mesh, drawnCards.length);
             }
         } else {
-            // 点击空白区域 → 随机抽
-            handleSwipeUp();
+            // 点击空白区域 → 随机抽（只有在确认场景后才允许）
+            if (topicConfirmed) {
+                handleSwipeUp();
+            }
         }
     }
 
@@ -465,7 +861,7 @@
                 document.body.style.cursor = hoveredMesh ? 'pointer' : 'default';
             }
 
-            // 跑马灯（hover 时暂停）
+            // 跑马灯：持续移动，经过中心时放大
             if (!marqueesPaused) {
                 cardsGroup.children.forEach(mesh => {
                     mesh.position.x -= SCROLL_SPEED;
@@ -475,7 +871,7 @@
                 });
             }
 
-            // 每张牌：淡出 + hover 缩放
+            // 每张牌：淡出
             cardsGroup.children.forEach(mesh => {
                 const wx = cardsGroup.position.x + mesh.position.x; // 世界 X 近似
                 // 淡出：进入淡出区间后透明度线性降为 0
@@ -484,18 +880,6 @@
                     opacity = Math.max(0, (wx - FADE_END) / (FADE_START - FADE_END));
                 }
                 setMeshOpacity(mesh, opacity);
-
-                // hover 缩放与前移（lerp 系数调大让动画更跟手）
-                const isHov = mesh === hoveredMesh;
-                if (isHov) {
-                    setMeshGlow(mesh, true);
-                    mesh.scale.lerp(_scaleHov, 0.25);
-                    mesh.position.z += (1.8 - mesh.position.z) * 0.22;
-                } else {
-                    setMeshGlow(mesh, false);
-                    mesh.scale.lerp(_scaleNorm, 0.22);
-                    mesh.position.z += (0 - mesh.position.z) * 0.18;
-                }
             });
 
             // 整体漂浮
@@ -515,14 +899,12 @@
     const cursorEl    = document.getElementById('cursor');
     const loadingEl   = document.getElementById('loading');
 
-    // ── 手势状态：检测单次快速向上划动 ──
-    // 原理：对手腕 Y 做指数平滑，当平滑后速度超过阈值即触发，不需要蓄力
-    const SWIPE_SPEED_THRESHOLD = 0.022; // 每帧平滑速度阈值（归一化 0~1）
+    // ── 手势状态：检测手掌翻转动作 ──
+    // 原理：检测手掌从朝下（手背朝前）转变为朝上（掌心朝前）
+    // 使用食指和中指的关键点来判断手掌方向
     const SWIPE_COOLDOWN_MS = 1500;      // 触发后冷却，避免连续触发
 
-    let prevWristY = null;
-    let smoothDY   = 0;          // 指数平滑后的 dy
-    const SMOOTH_FACTOR = 0.35;  // 平滑系数（越大越灵敏）
+    let handOrientation = null;  // 'down'(朝下/手背朝前) 或 'up'(朝上/掌心朝前)
     let swipeCooldown = false;
     let swipeReady = false;
 
@@ -535,43 +917,46 @@
     function onHandResults(results) {
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
             const lm = results.multiHandLandmarks[0];
-            const wrist    = lm[0];
-            const indexTip = lm[8];
-
-            // 镜像 X 显示光标
-            const cx = (1 - indexTip.x) * innerWidth;
-            const cy = indexTip.y * innerHeight;
+            
+            // 使用食指指尖(8)和中指指尖(9)与对应指根(6,7)来判断手掌方向
+            // 如果指尖y值 > 指根y值，说明手指朝下（手背朝前）
+            // 如果指尖y值 < 指根y值，说明手指朝上（掌心朝前）
+            const indexTipY = lm[8].y;
+            const indexMCPY = lm[5].y;
+            const middleTipY = lm[12].y;
+            const middleMCPY = lm[9].y;
+            
+            // 计算平均手指方向
+            const fingersDown = (indexTipY > indexMCPY ? 1 : 0) + (middleTipY > middleMCPY ? 1 : 0);
+            // 如果至少2个手指朝下，认为是手掌朝下
+            const isHandDown = fingersDown >= 1;
+            
+            // 镜像 X 显示光标（使用手腕位置）
+            const wrist = lm[0];
+            const cx = (1 - wrist.x) * innerWidth;
+            const cy = wrist.y * innerHeight;
             cursorEl.style.left = `${cx}px`;
             cursorEl.style.top  = `${cy}px`;
 
-            const wy = wrist.y; // 0=顶, 1=底
-
-            if (prevWristY !== null) {
-                const rawDY = prevWristY - wy; // 正值 = 手腕向上
-                // 指数平滑，抑制抖动
-                smoothDY = smoothDY * (1 - SMOOTH_FACTOR) + rawDY * SMOOTH_FACTOR;
-
-                if (smoothDY > SWIPE_SPEED_THRESHOLD && !swipeCooldown) {
-                    // 检测到快速向上动作，立即触发
-                    swipeCooldown = true;
-                    smoothDY = 0;
-                    prevWristY = null;
-                    cursorEl.classList.add('swiping');
-                    setTimeout(() => {
-                        cursorEl.classList.remove('swiping');
-                        swipeCooldown = false;
-                    }, SWIPE_COOLDOWN_MS);
-                    handleSwipeUp();
-                }
+            // 检测手掌翻转：从朝下转变为朝上时触发
+            if (handOrientation === 'down' && !isHandDown && !swipeCooldown) {
+                // 检测到手掌从朝下转变为朝上
+                swipeCooldown = true;
+                cursorEl.classList.add('swiping');
+                setTimeout(() => {
+                    cursorEl.classList.remove('swiping');
+                    swipeCooldown = false;
+                }, SWIPE_COOLDOWN_MS);
+                handleSwipeUp();
             }
-
-            prevWristY = wy;
+            
+            // 更新手掌方向状态
+            handOrientation = isHandDown ? 'down' : 'up';
             swipeReady = true;
         } else {
             // 手消失，重置状态
             if (swipeReady) {
-                prevWristY = null;
-                smoothDY = 0;
+                handOrientation = null;
                 swipeReady = false;
             }
             cursorEl.style.left = '-100px';
@@ -599,8 +984,12 @@
     // ─── 抽卡动画 ─────────────────────────────────────────────────────────
     // 三张牌的目标位置（中间偏上，左中右排列）
     function getTargetPos(slotIndex) {
-        const offsets = [-3.0, 0, 3.0];
-        return new THREE.Vector3(offsets[slotIndex], 2.2, 7);
+        const isMobile = window.innerWidth < 768;
+        const offsetX = isMobile ? 2.0 : 3.0;
+        const offsets = [-offsetX, 0, offsetX];
+        const yPos = isMobile ? 1.5 : 2.2;
+        const zPos = isMobile ? 5 : 7;
+        return new THREE.Vector3(offsets[slotIndex], yPos, zPos);
     }
 
     function animateDrawCard(mesh, slotIndex) {
@@ -619,9 +1008,9 @@
 
         const startPos  = mesh.position.clone();
         const targetPos = getTargetPos(slotIndex);
-        const targetQuat = new THREE.Quaternion(); // 正对摄像机
-
+        
         // 目标旋转：Y轴翻转180°，让正面朝向摄像机
+        // 因为现在背面在 index 4（朝向摄像机），所以需要翻转显示正面
         const flipQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0));
 
         let revealed = false;
@@ -631,16 +1020,20 @@
             p++;
             const t = easeInOut(p / dur);
             mesh.position.lerpVectors(startPos, targetPos, t);
+            // 使用翻转四元数让正面朝向摄像机
             THREE.Quaternion.slerp(worldQuat, flipQuat, mesh.quaternion, t);
             const s = 1 + Math.sin(t * Math.PI) * 0.25;
             mesh.scale.set(s, s, s);
+            
             // 动画过半时切换到正面材质
             if (!revealed && t >= 0.5) {
                 revealed = true;
+                // 交换材质：现在 index 4 放正面材质
                 const mat = mesh.material.slice();
                 mat[4] = mesh.userData._frontMat;
                 mesh.material = mat;
             }
+            
             if (p < dur) {
                 requestAnimationFrame(step);
             } else {
@@ -671,17 +1064,31 @@
     const POSITIONS = ["过去·根源", "现在·核心", "未来·走向"];
 
     function generateReading(cards) {
-        // 基于三张牌的关键词生成解读文本
+        // 基于三张牌的关键词和选择的场景生成解读文本
         const [c1, c2, c3] = cards;
         const kw = (c) => c.keywords.join('、');
+        
+        // 获取场景信息
+        const topicData = TOPICS.find(t => t.id === selectedTopic);
+        
+        // 根据场景调整解读
+        let pastContext = '';
+        let presentContext = '';
+        let futureContext = '';
+        
+        if (topicData) {
+            pastContext = `关于你的${topicData.label}，`;
+            presentContext = `在你关注的${topicData.label}领域，`;
+            futureContext = `对于你${topicData.label}的未来发展，`;
+        }
 
-        const past = `${c1.name}（${c1.en}）携带着"${kw(c1)}"的能量，暗示过去的经历塑造了当前的处境。${c1.desc}这段过去的经历是理解现状的重要线索。`;
+        const past = `${pastContext}${c1.name}（${c1.en}）携带着"${kw(c1)}"的能量，暗示过去的经历塑造了当前的处境。${c1.desc}这段过去的经历是理解现状的重要线索。`;
 
-        const present = `${c2.name}（${c2.en}）占据核心位置，以"${kw(c2)}"为主题贯穿当下。${c2.desc}此刻你正处于这种能量的中心，它深刻影响着你的每个决定。`;
+        const present = `${presentContext}${c2.name}（${c2.en}）占据核心位置，以"${kw(c2)}"为主题贯穿当下。${c2.desc}此刻你正处于这种能量的中心，它深刻影响着你的每个决定。`;
 
-        const future = `${c3.name}（${c3.en}）指向前方，"${kw(c3)}"将是你即将遇见的主要力量。${c3.desc}顺应或有意识地应对这股能量，将是关键所在。`;
+        const future = `${futureContext}${c3.name}（${c3.en}）指向前方，"${kw(c3)}"将是你即将遇见的主要力量。${c3.desc}顺应或有意识地应对这股能量，将是关键所在。`;
 
-        // 三牌联合解读
+        // 三牌联合解读（带场景关联）
         const combo = generateComboReading(c1, c2, c3);
 
         return { past, present, future, overall: combo };
@@ -702,7 +1109,25 @@
         else if (total === -1) tone = "牌阵中挑战的能量较强，但每次考验都是蜕变的契机。";
         else                  tone = "牌阵揭示出深刻的转化时期，需要勇气与智慧共同应对。";
 
-        return `三张牌以"${c1.name} → ${c2.name} → ${c3.name}"的叙事线贯穿始终。${tone} 从"${c1.keywords[0]}"出发，经由"${c2.keywords[0]}"的洗礼，最终抵达"${c3.keywords[0]}"的彼岸——这是命运为你编织的独特旅程。请以开放的心态审视每一张牌背后的信息，它们共同构成了当前阶段最重要的灵性指引。`;
+        // 添加场景专属建议
+        let topicAdvice = '';
+        if (selectedTopic && TOPIC_WEIGHTS[selectedTopic]) {
+            const tw = TOPIC_WEIGHTS[selectedTopic];
+            const cardIds = [c1.id, c2.id, c3.id];
+            const matches = cardIds.filter(id => tw.positive.includes(id));
+            const challenges = cardIds.filter(id => tw.negative.includes(id));
+            const currentTopic = TOPICS.find(t => t.id === selectedTopic);
+            
+            if (matches.length >= 2) {
+                topicAdvice = `\n\n✨ 针对你选择的「${currentTopic?.label}」领域，这组牌显示出有利的能量流动，把握当下会有好的收获。`;
+            } else if (challenges.length >= 2) {
+                topicAdvice = `\n\n💡 在「${currentTopic?.label}」领域，这组牌提示你需要谨慎应对可能的挑战，保持清醒和耐心。`;
+            } else {
+                topicAdvice = `\n\n🌟 作为你「${currentTopic?.label}」的指引，这组牌建议你保持开放心态，顺势而为。`;
+            }
+        }
+
+        return `三张牌以"${c1.name} → ${c2.name} → ${c3.name}"的叙事线贯穿始终。${tone} 从"${c1.keywords[0]}"出发，经由"${c2.keywords[0]}"的洗礼，最终抵达"${c3.keywords[0]}"的彼岸——这是命运为你编织的独特旅程。请以开放的心态审视每一张牌背后的信息，它们共同构成了当前阶段最重要的灵性指引。${topicAdvice}`;
     }
 
     function showResult() {
@@ -712,17 +1137,7 @@
 
         const cardData = drawnCards.map(m => m.userData);
 
-        // 生成解读
-        const reading = generateReading(cardData);
-        document.getElementById('read-past').textContent    = reading.past;
-        document.getElementById('read-present').textContent = reading.present;
-        document.getElementById('read-future').textContent  = reading.future;
-        document.getElementById('read-overall').textContent = reading.overall;
-
-        // 直接渲染正面卡片
-        const readingPanel = document.getElementById('reading-panel');
-        readingPanel.classList.remove('hidden');
-
+        // 渲染三张牌卡片
         cardData.forEach((cd, i) => {
             const emojiIdx = LENORMAND_CARDS.findIndex(c => c.id === cd.id);
             const posLabel = POSITIONS[i];
@@ -738,6 +1153,20 @@
             if (i > 0) row.insertAdjacentHTML('beforeend', '<div class="connector-arrow">→</div>');
             row.insertAdjacentHTML('beforeend', itemHTML);
         });
+
+        // 生成解读
+        const reading = generateReading(cardData);
+        document.getElementById('read-past').textContent    = reading.past;
+        document.getElementById('read-present').textContent = reading.present;
+        document.getElementById('read-future').textContent  = reading.future;
+        document.getElementById('read-overall').textContent = reading.overall;
+
+        // 更新标题显示场景
+        const currentTopic = TOPICS.find(t => t.id === selectedTopic);
+        const titleEl = overlay.querySelector('h2');
+        if (currentTopic && titleEl) {
+            titleEl.innerHTML = `✦ ${currentTopic.icon} ${currentTopic.label} 命运三牌阵 ✦`;
+        }
 
         overlay.classList.add('visible');
     }
@@ -764,8 +1193,7 @@
         cardsGroup = new THREE.Group();
         scene.add(cardsGroup);
         totalCardWidth = LENORMAND_CARDS.length * CARD_SPACING;
-        const shuffledR = [...LENORMAND_CARDS].sort(() => Math.random() - 0.5);
-        shuffledR.forEach((cardData, i) => {
+        LENORMAND_CARDS.forEach((cardData, i) => {
             const mesh = makeCardMesh(cardData, i);
             mesh.position.x = (i - LENORMAND_CARDS.length / 2) * CARD_SPACING;
             mesh.rotation.z = (Math.random() - 0.5) * 0.12;
@@ -778,10 +1206,51 @@
         prevWristY = null;
         smoothDY = 0;
         swipeReady = false;
+        
+        // 重置场景选择
+        selectedTopic = null;
+        topicConfirmed = false;
+        document.getElementById('topic-screen').classList.remove('visible');
+        document.getElementById('topic-confirm').classList.remove('active');
+        
+        // 重新显示场景选择页
+        setTimeout(() => showTopicScreen(), 500);
     }
 
     // 暴露给 HTML button
     window.resetAll = resetAll;
+
+    // 生成流沙粒子
+    function createSandParticles() {
+        const container = document.getElementById('sand-container');
+        if (!container) return;
+        container.innerHTML = '';
+        const particleCount = 12;
+        for (let i = 0; i < particleCount; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'sand-particle';
+            // 随机分布在圆形区域内
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 5 + Math.random() * 25;
+            const x = 40 + Math.cos(angle) * radius;
+            const y = 40 + Math.sin(angle) * radius;
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+            particle.style.opacity = 0.4 + Math.random() * 0.6;
+            particle.style.transform = `scale(${0.5 + Math.random() * 0.5})`;
+            container.appendChild(particle);
+        }
+    }
+
+    // 显示场景选择页（loading完成后调用）
+    function showTopicScreen() {
+        renderTopics();
+        // 隐藏抽卡页UI，确保loading后直接显示标签选择页
+        document.getElementById('header').style.display = 'none';
+        document.getElementById('draw-count').style.display = 'none';
+        document.getElementById('gesture-hint').style.display = 'none';
+        document.getElementById('topic-screen').classList.add('visible');
+    }
 
     // ─── MediaPipe Camera ─────────────────────────────────────────────────
     const cameraInstance = new Camera(videoElement, {
@@ -791,9 +1260,19 @@
     cameraInstance.start().then(() => {
         loadingEl.style.transition = 'opacity 0.8s';
         loadingEl.style.opacity = '0';
-        setTimeout(() => { loadingEl.style.display = 'none'; }, 800);
+        // Loading淡出完成后立即显示标签选择页（不显示抽卡跑马灯）
+        setTimeout(() => {
+            loadingEl.style.display = 'none';
+            // Loading完成后直接显示场景选择页
+            showTopicScreen();
+        }, 800);
     }).catch(() => {
         loadingEl.innerHTML = '<div class="text-4xl mb-4">⚠️</div><div class="text-xl" style="color:#f87171">摄像头权限被拒绝</div><div class="text-sm text-gray-500 mt-2">无法进行手势识别</div>';
+        // 即使摄像头失败也允许继续
+        setTimeout(() => {
+            loadingEl.style.display = 'none';
+            showTopicScreen();
+        }, 2000);
     });
 
     // ─── 启动 ─────────────────────────────────────────────────────────────
@@ -801,8 +1280,12 @@
         init3D();
         initMeteors();
         initIntroScreen(); // 欢迎引导页
+        createSandParticles(); // 生成水晶球流沙粒子
         window.addEventListener('resize', () => {
+            const isMobile = window.innerWidth < 768;
             camera.aspect = innerWidth / innerHeight;
+            camera.fov = isMobile ? 85 : 70;
+            camera.position.z = isMobile ? 10 : 14;
             camera.updateProjectionMatrix();
             renderer.setSize(innerWidth, innerHeight);
             // 同步流星雨画布尺寸
