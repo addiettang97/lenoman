@@ -371,8 +371,8 @@
 
         const mesh = new THREE.Mesh(geometry, [
             sideMat, sideMat, sideMat, sideMat,
-            frontMat,
-            backMat
+            backMat,   // 初始正对摄像机的面显示背面
+            frontMat   // 背朝摄像机的面放正面纹理（备用）
         ]);
         mesh.userData = {
             ...cardData, index: i,
@@ -396,12 +396,12 @@
         });
     }
 
-    // 切换 hover 高亮材质（只在状态变化时执行，避免每帧替换）
+    // 切换 hover 高亮材质（hover 时翻到正面发光，离开恢复背面）
     function setMeshGlow(mesh, on) {
         if (mesh.userData._glowOn === on) return;
         mesh.userData._glowOn = on;
         const mat = mesh.material.slice();
-        mat[4] = on ? mesh.userData._frontMatGlow : mesh.userData._frontMat;
+        mat[4] = on ? mesh.userData._frontMatGlow : mesh.userData._backMat;
         mesh.material = mat;
     }
 
@@ -653,15 +653,26 @@
         const targetPos = getTargetPos(slotIndex);
         const targetQuat = new THREE.Quaternion(); // 正对摄像机
 
+        // 目标旋转：Y轴翻转180°，让正面朝向摄像机
+        const flipQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0));
+
+        let revealed = false;
         let p = 0;
         const dur = 75;
         function step() {
             p++;
             const t = easeInOut(p / dur);
             mesh.position.lerpVectors(startPos, targetPos, t);
-            THREE.Quaternion.slerp(worldQuat, targetQuat, mesh.quaternion, t);
+            THREE.Quaternion.slerp(worldQuat, flipQuat, mesh.quaternion, t);
             const s = 1 + Math.sin(t * Math.PI) * 0.25;
             mesh.scale.set(s, s, s);
+            // 动画过半时切换到正面材质
+            if (!revealed && t >= 0.5) {
+                revealed = true;
+                const mat = mesh.material.slice();
+                mat[4] = mesh.userData._frontMat;
+                mesh.material = mat;
+            }
             if (p < dur) {
                 requestAnimationFrame(step);
             } else {
