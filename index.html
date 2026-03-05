@@ -428,7 +428,8 @@
 
         const total = LENORMAND_CARDS.length;
         totalCardWidth = total * CARD_SPACING;
-        LENORMAND_CARDS.forEach((cardData, i) => {
+        const shuffled = [...LENORMAND_CARDS].sort(() => Math.random() - 0.5);
+        shuffled.forEach((cardData, i) => {
             const mesh = makeCardMesh(cardData, i);
             mesh.position.x = (i - total / 2) * CARD_SPACING;
             mesh.rotation.z = (Math.random() - 0.5) * 0.12;
@@ -815,7 +816,8 @@
         cardsGroup = new THREE.Group();
         scene.add(cardsGroup);
         totalCardWidth = LENORMAND_CARDS.length * CARD_SPACING;
-        LENORMAND_CARDS.forEach((cardData, i) => {
+        const shuffledR = [...LENORMAND_CARDS].sort(() => Math.random() - 0.5);
+        shuffledR.forEach((cardData, i) => {
             const mesh = makeCardMesh(cardData, i);
             mesh.position.x = (i - LENORMAND_CARDS.length / 2) * CARD_SPACING;
             mesh.rotation.z = (Math.random() - 0.5) * 0.12;
